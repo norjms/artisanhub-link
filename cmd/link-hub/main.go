@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // link-hub runs next to the hub. Paired sites dial in over a WebSocket. Each
 // printer a site reports gets an overlay address (198.18.x.y by default); TCP sent to that
 // address is redirected here by iptables and carried to the site.

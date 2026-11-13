@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package wire holds what both sides share: keys, the pairing handshake,
 // and the stream header.
 package wire

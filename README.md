@@ -45,6 +45,13 @@ Installers are not published yet.
 Installing the site connector needs administrator rights, because it runs as a
 system service that starts with the computer.
 
+Link replaces the OpenPrintHQ client app and broker for reaching printers on
+another network. See [section 12 of the design](docs/design.md#12-replacing-the-openprinthq-client-app-and-broker).
+
+## License
+
+GNU Affero General Public License v3.0 only. See [LICENSE](LICENSE).
+
 ## Building the prototype
 
 Go 1.25 or later:

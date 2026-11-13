@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // link-site runs at the printer site. It dials out to the paired hub, reports
 // the printers it finds, and opens connections to those printers only, on the
 // ports each printer family uses.

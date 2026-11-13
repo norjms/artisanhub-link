@@ -241,11 +241,47 @@ each printer. Overlay addresses come from one range, so printer addresses never
 clash across sites. A site that goes offline marks only its own printers
 offline.
 
-## 12. Open questions
+## 12. Replacing the OpenPrintHQ client app and broker
 
-1. Whether Link replaces the existing OpenPrintHQ site client and broker, or
-   runs beside it.
-2. License for this repository.
-3. PrusaLink discovery on a real MK4S, the Voron's Moonraker, and Elegoo
+Link replaces the OpenPrintHQ client app and its broker as the way a farm
+reaches printers on another network. That covers ArtisanHub Farm, a hosted
+farm, and OpenPrintHQ run on its own.
+
+What changes:
+
+- **One program at each site.** Link Site is the only thing installed at a
+  printer site. The client app is no longer needed there.
+- **The farm talks to printers directly.** The farm engine already speaks each
+  printer's protocol (Bambu MQTT and FTPS, Moonraker, OctoPrint, PrusaLink).
+  It now uses the printer's overlay address instead of a relay. Nothing at the
+  site runs farm commands; it only carries a printer's own protocol to a port
+  on that printer's list.
+- **Command signing moves out of the site.** The client app needed signed
+  commands because it acted on the farm's behalf. Link Site acts on nothing, so
+  the risk is covered by pairing and the port lists instead. Printer
+  credentials (Bambu access codes, OctoPrint and PrusaLink keys) stay in the
+  farm, as on a local network.
+- **Cameras go through the hub.** go2rtc in the hub reads each camera at its
+  overlay address and serves it to the browser and the apps from the hub. The
+  broker's direct browser to client connection is not needed.
+- **No broker service.** There is nothing to run between the hub and the site
+  except the hub's own address. Hosted farms reach their customers' printers
+  the same way.
+
+Moving an existing site:
+
+1. Install Link Site at the site and pair it with the hub.
+2. The farm matches printers it already knows to the ones Link reports, by
+   serial number (Bambu) or by address, and switches each to its overlay
+   address. Print history, files and spools are kept.
+3. Uninstall the client app. When no site uses it, the broker is turned off.
+
+## 13. License
+
+AGPL-3.0-only, the same license as the hub and the farm.
+
+## 14. Open questions
+
+1. PrusaLink discovery on a real MK4S, the Voron's Moonraker, and Elegoo
    discovery on hardware.
-4. Whether Link Hub should also expose a status API to Home Assistant.
+2. Whether Link Hub should also expose a status API to Home Assistant.
