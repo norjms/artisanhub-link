@@ -76,12 +76,15 @@ Pairing creates trust in both directions with one short code.
    both keys, so a stolen code or a copied hub certificate is not enough to
    pose as either side.
 
-Both screens show the same short fingerprint (four words) so a careful owner
-can compare them. Removing a site in the hub revokes its key at once.
+Both screens show the same short fingerprint (four groups of hex, worked out
+from both public keys) so a careful owner can compare them. The site checks the
+hub's fingerprint itself and refuses to pair if they differ. Pairing tries are
+limited to 10 per address every 10 minutes. Removing a site in the hub revokes its key at once.
 
-The site's private key is stored where only the service can read it: the
-Windows service account with DPAPI, the macOS System keychain, or a root-only
-file on Linux and Docker.
+The site's private key is stored where only the service can read it: a file
+readable only by its owner in the data folder (`/data` in Docker,
+`C:\ProgramData\ArtisanHub Link` on Windows). Moving it to DPAPI and the macOS
+System keychain is planned.
 
 ## 4. The connection
 
@@ -90,16 +93,18 @@ file on Linux and Docker.
   It also works when the hub is published through Cloudflare Tunnel.
 - Inside the WebSocket the two sides run a Noise IK handshake with their
   pinned keys. Traffic is encrypted end to end between the site and Link Hub,
-  even where TLS ends at Cloudflare or the reverse proxy. (The prototype uses a
-  simpler signed handshake; Noise replaces it.)
+  even where TLS ends at Cloudflare or the reverse proxy
+  (`Noise_IK_25519_ChaChaPoly_BLAKE2s`).
 - Over that, yamux carries one stream per printer connection, so many
-  connections share one link. Keepalives run every 20 seconds.
+  connections share one link. Keepalives run every 20 seconds. Limits: 256 open
+  streams per site, 32 per printer, and 50 new streams a second per site.
 - If the link drops, the site reconnects with backoff and jitter. Printer
   connections in flight end, and the farm's normal reconnect logic takes over.
 - One site key may have only one live connection. If a second copy of a site
   connects (for example a cloned VM), the hub keeps the first and marks the
   site "connected twice" in the UI. The prototype showed that without this
-  rule two copies knock each other off every few seconds.
+  rule two copies knock each other off every few seconds. A second copy is
+  refused and the hub's status shows `connected_twice_at`.
 
 ## 5. Addresses (the overlay)
 
@@ -125,8 +130,8 @@ Details:
   collide with home networks, Docker, or Tailscale, which uses
   `100.64.0.0/10`). The installer moves it if the range is already in use.
 - Addresses are kept per site and printer serial (or MAC address when there is
-  no serial) and survive restarts. The prototype assigned them in order of
-  discovery, and they changed when the hub restarted.
+  no serial) and survive restarts in `/data/state.json`. Removing a site frees
+  its addresses.
 - Link Hub owns the range with an iptables redirect in its own network
   namespace. The hub host gets one route for the range pointing at the Link Hub
   container. The installer adds that route with a short privileged helper at

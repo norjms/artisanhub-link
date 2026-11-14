@@ -54,16 +54,28 @@ GNU Affero General Public License v3.0 only. See [LICENSE](LICENSE).
 
 ## Trying the preview on Windows
 
-Releases are on the [Releases page](https://github.com/norjms/artisanhub-link/releases). Pairing by
-code is not built yet, so the preview is set up with the hub's address and key:
+Releases are on the [Releases page](https://github.com/norjms/artisanhub-link/releases). In the hub,
+add a printer site to get a pairing code, then:
 
 ```powershell
-msiexec /i ArtisanHubLink-<version>-x64.msi HUBURL=wss://<your hub>/link HUBKEY=<hub key>
-& "C:\Program Files\ArtisanHub Link\link-site.exe" -config "C:\ProgramData\ArtisanHub Link\config.ini" -show-key
+msiexec /i ArtisanHubLink-<version>-x64.msi HUBURL=https://<your hub> PAIRCODE=<code>
 ```
 
-The second command prints this site's key, which the hub needs. The service is called
-**ArtisanHub Link** and keeps its log in `C:\ProgramData\ArtisanHub Link`.
+The service is called **ArtisanHub Link** and keeps its log in `C:\ProgramData\ArtisanHub Link`.
+
+## Docker
+
+On one always-on Linux machine at the printer site (host networking, so it can hear printers announce
+themselves):
+
+```sh
+docker run -d --name artisanhub-link --restart unless-stopped --network host \
+  -e LINK_HUB=https://<your hub> -e LINK_PAIR_CODE=<code> -e LINK_NAME="Home" \
+  -v artisanhub-link:/data ghcr.io/norjms/artisanhub-link:latest
+```
+
+The code is used once; the site keeps its key and pairing in the `/data` volume. Printers that do not
+announce themselves can be added with `-e LINK_PRINTERS=moonraker=192.168.1.20,octoprint=192.168.1.21`.
 
 ## Code signing
 

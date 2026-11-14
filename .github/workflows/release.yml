@@ -107,8 +107,7 @@ jobs:
         shell: pwsh
         run: |
           $msi = (Resolve-Path "msi/ArtisanHubLink-$env:VERSION-x64.msi").Path
-          $key = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
-          $p = Start-Process msiexec -Wait -PassThru -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', 'install.log', 'HUBURL=wss://hub.example.invalid/link', "HUBKEY=$key")
+          $p = Start-Process msiexec -Wait -PassThru -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', 'install.log', 'HUBURL=https://hub.example.invalid', 'PAIRCODE=AAAA-AAAA-AAAA')
           if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 80; throw "install failed: $($p.ExitCode)" }
           $svc = Get-Service ArtisanHubLink
           if ($svc.Status -ne 'Running') { throw "service is $($svc.Status)" }
