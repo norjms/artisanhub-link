@@ -35,6 +35,7 @@ jobs:
           done
       - name: No em dashes
         run: |
-          if grep -rIn $'—' --exclude-dir=.git . ; then
+          dash="$(printf '\342\200\224')"
+          if grep -rIn "$dash" --exclude-dir=.git . ; then
             echo "Em dashes are not used in this repository."; exit 1
           fi
