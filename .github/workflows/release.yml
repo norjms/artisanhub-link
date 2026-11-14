@@ -1,0 +1,215 @@
+name: Release
+
+# A tag v* builds every platform, builds the Windows installers, has SignPath
+# sign them when the project is set up there, and publishes a GitHub release.
+# Run by hand, it builds and tests everything without publishing.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  binaries:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      numeric: ${{ steps.version.outputs.numeric }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - id: version
+        name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            v="${GITHUB_REF#refs/tags/v}"
+          else
+            v="0.0.0-dev.${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "numeric=${v%%-*}" >> "$GITHUB_OUTPUT"
+      - name: Windows version information
+        env:
+          NUMERIC: ${{ steps.version.outputs.numeric }}
+        run: |
+          go run github.com/tc-hib/go-winres@v0.3.3 simply \
+            --arch amd64,arm64 \
+            --out cmd/link-site/rsrc \
+            --manifest cli \
+            --product-name "ArtisanHub Link" \
+            --product-version "$NUMERIC.0" \
+            --file-version "$NUMERIC.0" \
+            --file-description "ArtisanHub Link site connector" \
+            --original-filename link-site.exe \
+            --copyright "Copyright James Norman. AGPL-3.0-only."
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*}; arch=${target#*/}; ext=""
+            if [ "$os" = windows ]; then ext=.exe; fi
+            GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
+              -o "dist/$os-$arch/link-site$ext" ./cmd/link-site
+            if [ "$os" = linux ]; then
+              GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
+                -o "dist/$os-$arch/link-hub" ./cmd/link-hub
+            fi
+            cp LICENSE "dist/$os-$arch/"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+
+  windows:
+    needs: binaries
+    runs-on: windows-2022
+    permissions:
+      contents: read
+      actions: read
+    env:
+      VERSION: ${{ needs.binaries.outputs.version }}
+      NUMERIC: ${{ needs.binaries.outputs.numeric }}
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+    outputs:
+      signed: ${{ steps.collect.outputs.signed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: dist
+      - name: Install WiX
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.Firewall.wixext/5.0.2
+          wix extension add -g WixToolset.Util.wixext/5.0.2
+      - name: Build the installers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force msi | Out-Null
+          foreach ($a in @(@{ msi = 'x64'; go = 'amd64' }, @{ msi = 'arm64'; go = 'arm64' })) {
+            wix build packaging/windows/link-site.wxs -arch $a.msi `
+              -ext WixToolset.Firewall.wixext -ext WixToolset.Util.wixext `
+              -d Version=$env:NUMERIC -d BinDir="dist/windows-$($a.go)" -d SrcDir=. `
+              -o "msi/ArtisanHubLink-$env:VERSION-$($a.msi).msi"
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+          Get-ChildItem msi
+      - name: Install, check and remove the x64 installer
+        shell: pwsh
+        run: |
+          $msi = (Resolve-Path "msi/ArtisanHubLink-$env:VERSION-x64.msi").Path
+          $key = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+          $p = Start-Process msiexec -Wait -PassThru -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', 'install.log', 'HUBURL=wss://hub.example.invalid/link', "HUBKEY=$key")
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 80; throw "install failed: $($p.ExitCode)" }
+          $svc = Get-Service ArtisanHubLink
+          if ($svc.Status -ne 'Running') { throw "service is $($svc.Status)" }
+          Start-Sleep -Seconds 10
+          $data = Join-Path $env:ProgramData 'ArtisanHub Link'
+          Get-Content (Join-Path $data 'config.ini')
+          Get-Content (Join-Path $data 'link-site.log')
+          if (-not (Test-Path (Join-Path $data 'site.key'))) { throw 'no site key was made' }
+          (Get-Acl $data).Access | Format-Table IdentityReference, FileSystemRights, IsInherited
+          if ((Get-Acl $data).Access | Where-Object { $_.IdentityReference -match 'Users$' }) { throw 'users can read the settings folder' }
+          & (Join-Path ${env:ProgramFiles} 'ArtisanHub Link\link-site.exe') -version
+          $p = Start-Process msiexec -Wait -PassThru -ArgumentList @('/x', "`"$msi`"", '/qn', '/l*v', 'uninstall.log')
+          if ($p.ExitCode -ne 0) { Get-Content uninstall.log -Tail 80; throw "uninstall failed: $($p.ExitCode)" }
+          if (Get-Service ArtisanHubLink -ErrorAction SilentlyContinue) { throw 'service still installed' }
+          if (Test-Path $data) { throw 'settings folder left behind' }
+          'install, run and uninstall: ok'
+      - id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unsigned
+          path: msi/*.msi
+      - name: Sign with SignPath
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: artisanhub-link
+          signing-policy-slug: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-signing' || 'test-signing' }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+      - id: collect
+        name: Collect the installers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          if (Test-Path signed) {
+            Copy-Item signed/*.msi out/
+            foreach ($f in Get-ChildItem out/*.msi) {
+              $sig = Get-AuthenticodeSignature $f.FullName
+              if ($sig.Status -ne 'Valid') { throw "$($f.Name): signature $($sig.Status)" }
+            }
+            "signed=true" >> $env:GITHUB_OUTPUT
+          } else {
+            Copy-Item msi/*.msi out/
+            "signed=false" >> $env:GITHUB_OUTPUT
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/*.msi
+
+  release:
+    needs: [binaries, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.binaries.outputs.version }}
+      SIGNED: ${{ needs.windows.outputs.signed }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: windows
+      - name: Package
+        run: |
+          mkdir out
+          for d in dist/*/; do
+            name=$(basename "$d")
+            case "$name" in
+              windows-*) (cd "$d" && zip -q "../../out/artisanhub-link-$VERSION-$name.zip" ./*) ;;
+              *) chmod +x "$d"/link-*; tar -C "$d" -czf "out/artisanhub-link-$VERSION-$name.tar.gz" . ;;
+            esac
+          done
+          cp windows/*.msi out/
+          (cd out && sha256sum ./* > SHA256SUMS)
+          {
+            echo "ArtisanHub Link $VERSION."
+            echo
+            echo "This is a preview: pairing is by hand until the pairing code arrives. See the README."
+            echo
+            if [ "$SIGNED" = true ]; then
+              echo "The Windows installers are signed. Free code signing provided by SignPath.io, certificate by SignPath Foundation."
+            else
+              echo "The Windows installers in this release are not signed yet. Check them against SHA256SUMS."
+            fi
+            echo "macOS and Linux files are plain binaries for now; installers for them follow."
+          } > notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$VERSION" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" \
+            --title "ArtisanHub Link $VERSION" --notes-file notes.md $pre

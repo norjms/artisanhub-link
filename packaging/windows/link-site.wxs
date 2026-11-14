@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!--
+  ArtisanHub Link site connector for Windows.
+  Installs link-site.exe as the ArtisanHubLink service, running as Local Service.
+  Settings and the site's key live in %ProgramData%\ArtisanHub Link, readable
+  only by the service, SYSTEM and administrators.
+  Optional properties: HUBURL and HUBKEY write the hub address and hub key.
+  Build: wix build link-site.wxs -arch x64 -ext WixToolset.Firewall.wixext
+         -ext WixToolset.Util.wixext -d Version=0.1.0 -d BinDir=... -d SrcDir=...
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="ArtisanHub Link"
+           Manufacturer="ArtisanHub"
+           Version="$(var.Version)"
+           UpgradeCode="1325E3DA-9944-4E5D-8FBC-B8326F9A1020"
+           Scope="perMachine"
+           Compressed="yes">
+    <SummaryInformation Description="ArtisanHub Link site connector" />
+
+    <!-- Install the new version before removing the old one, so the shared
+         settings folder and the site's key survive an upgrade. -->
+    <MajorUpgrade Schedule="afterInstallExecute"
+                  DowngradeErrorMessage="A newer version of ArtisanHub Link is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="HUBURL" Secure="yes" />
+    <Property Id="HUBKEY" Secure="yes" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/norjms/artisanhub-link" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/norjms/artisanhub-link/issues" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ArtisanHub Link" />
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATADIR" Name="ArtisanHub Link" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="LinkSite">
+      <Component Directory="INSTALLFOLDER">
+        <File Id="LinkSiteExe" Source="$(var.BinDir)\link-site.exe" KeyPath="yes">
+          <!-- Printers announce themselves on the local network (SSDP, mDNS).
+               Only the local subnet may reach the service. -->
+          <fw:FirewallException Id="LinkDiscovery"
+                                Name="ArtisanHub Link printer discovery"
+                                Protocol="udp"
+                                Scope="localSubnet"
+                                Profile="all" />
+        </File>
+        <ServiceInstall Name="ArtisanHubLink"
+                        DisplayName="ArtisanHub Link"
+                        Description="Connects the 3D printers on this network to your ArtisanHub hub."
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="NT AUTHORITY\LocalService"
+                        Arguments="-config &quot;[DATADIR]config.ini&quot;"
+                        Vital="yes">
+          <util:ServiceConfig FirstFailureActionType="restart"
+                              SecondFailureActionType="restart"
+                              ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="30"
+                              ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="LinkService"
+                        Name="ArtisanHubLink"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+      </Component>
+
+      <Component Directory="INSTALLFOLDER">
+        <File Id="LicenseTxt" Source="$(var.SrcDir)\LICENSE" Name="LICENSE.txt" KeyPath="yes" />
+      </Component>
+
+      <!-- Settings folder: only SYSTEM, administrators and Local Service. -->
+      <Component Id="DataFolder" Directory="DATADIR" Guid="5D669DBC-2A35-48BA-98B5-2F8AA8BFDE3C">
+        <CreateFolder>
+          <PermissionEx Sddl="O:SYG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LS)" />
+        </CreateFolder>
+        <RemoveFile Id="DataFiles" Name="*" On="uninstall" />
+        <RemoveFolder Id="DataFolderRemove" On="uninstall" />
+        <RemoveRegistryKey Root="HKLM" Key="Software\ArtisanHub Link" Action="removeOnUninstall" />
+      </Component>
+
+      <!-- Written only when given; kept across upgrades. -->
+      <Component Id="ConfigHub" Directory="DATADIR" Condition="HUBURL" Permanent="yes">
+        <RegistryValue Root="HKLM" Key="Software\ArtisanHub Link" Name="HubSet" Type="integer" Value="1" KeyPath="yes" />
+        <IniFile Id="IniHub" Action="addLine" Directory="DATADIR" Name="config.ini" Section="link" Key="hub" Value="[HUBURL]" />
+      </Component>
+      <Component Id="ConfigHubKey" Directory="DATADIR" Condition="HUBKEY" Permanent="yes">
+        <RegistryValue Root="HKLM" Key="Software\ArtisanHub Link" Name="HubKeySet" Type="integer" Value="1" KeyPath="yes" />
+        <IniFile Id="IniHubKey" Action="addLine" Directory="DATADIR" Name="config.ini" Section="link" Key="hub_key" Value="[HUBKEY]" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="ArtisanHub Link">
+      <ComponentGroupRef Id="LinkSite" />
+    </Feature>
+  </Package>
+</Wix>

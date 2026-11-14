@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -308,42 +310,122 @@ func (s *site) run(ctx context.Context, hubURL string, priv ed25519.PrivateKey, 
 	return fmt.Errorf("hub connection closed")
 }
 
+// version is set at build time.
+var version = "dev"
+
+type settings struct {
+	hub, hubKey, keyFile, printers string
+}
+
 func main() {
+	configFile := flag.String("config", "", "settings file (INI, section [link]: hub, hub_key, key, printers)")
 	hubURL := flag.String("hub", "", "hub link URL, wss://host/link")
 	hubKey := flag.String("hub-key", "", "hub public key pinned at pairing")
-	keyFile := flag.String("key", "site.key", "this site's private key file")
+	keyFile := flag.String("key", "", "this site's private key file (default: site.key beside the settings file, or in the current folder)")
 	static := flag.String("printers", "", "extra printers, family=ip,family=ip")
 	showKey := flag.Bool("show-key", false, "print this site's public key and exit")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
-	priv, err := wire.LoadOrCreateKey(*keyFile)
-	if err != nil {
-		log.Fatal(err)
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
+	// Flags win over the settings file, which is read again until the site is
+	// configured, so a service can start before pairing.
+	load := func() settings {
+		st := settings{hub: *hubURL, hubKey: *hubKey, keyFile: *keyFile, printers: *static}
+		if *configFile != "" {
+			ini, err := readINI(*configFile, "link")
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				log.Printf("settings: %v", err)
+			}
+			if st.hub == "" {
+				st.hub = ini["hub"]
+			}
+			if st.hubKey == "" {
+				st.hubKey = ini["hub_key"]
+			}
+			if st.printers == "" {
+				st.printers = ini["printers"]
+			}
+			if st.keyFile == "" {
+				st.keyFile = ini["key"]
+			}
+			if st.keyFile == "" {
+				st.keyFile = filepath.Join(filepath.Dir(*configFile), "site.key")
+			}
+		}
+		if st.keyFile == "" {
+			st.keyFile = "site.key"
+		}
+		return st
 	}
 	if *showKey {
+		priv, err := wire.LoadOrCreateKey(load().keyFile)
+		if err != nil {
+			log.Fatal(err)
+		}
 		fmt.Println(wire.PubString(priv.Public().(ed25519.PublicKey)))
 		return
 	}
-	hubPub, err := wire.ParsePub(*hubKey)
-	if err != nil {
-		log.Fatal("hub-key: ", err)
+	run := func(ctx context.Context) { siteMain(ctx, load) }
+	if runAsService(run) {
+		return
 	}
+	run(context.Background())
+}
+
+func siteMain(ctx context.Context, load func() settings) {
+	log.Printf("ArtisanHub Link site %s", version)
+	var st settings
+	for {
+		st = load()
+		if st.hub != "" && st.hubKey != "" {
+			break
+		}
+		log.Printf("not paired yet: the settings have no hub address and hub key; checking again in 30 s")
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(30 * time.Second):
+		}
+	}
+	priv, err := wire.LoadOrCreateKey(st.keyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	hubPub, err := wire.ParsePub(st.hubKey)
+	if err != nil {
+		log.Fatal("hub key: ", err)
+	}
+	log.Printf("site key %s", wire.PubString(priv.Public().(ed25519.PublicKey)))
 	s := newSite()
-	for _, item := range strings.Split(*static, ",") {
+	for _, item := range strings.Split(st.printers, ",") {
 		if fam, ip, ok := strings.Cut(strings.TrimSpace(item), "="); ok {
 			if _, known := familyPorts[fam]; known {
 				s.add(wire.Printer{IP: ip, Family: fam, Via: "static"})
 			}
 		}
 	}
-	ctx := context.Background()
 	go s.bambuSSDP(ctx)
 	go s.mdnsBrowse(ctx)
 	backoff := time.Second
-	for {
-		err := s.run(ctx, *hubURL, priv, hubPub)
+	for ctx.Err() == nil {
+		started := time.Now()
+		err := s.run(ctx, st.hub, priv, hubPub)
+		if ctx.Err() != nil {
+			return
+		}
+		if time.Since(started) > 5*time.Minute {
+			backoff = time.Second
+		}
 		log.Printf("hub: %v; retrying in %s", err, backoff)
-		time.Sleep(backoff)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
 		if backoff < time.Minute {
 			backoff *= 2
 		}

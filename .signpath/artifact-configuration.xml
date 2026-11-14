@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration for the Windows installers. The release
+  workflow uploads one ZIP holding the x64 and arm64 MSIs. The service binary
+  inside each MSI is signed first, then the MSI itself. Only files named
+  "ArtisanHub Link" in their version information are accepted.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <msi-file-set>
+      <include path="ArtisanHubLink-*-x64.msi" />
+      <include path="ArtisanHubLink-*-arm64.msi" />
+      <for-each>
+        <pe-file-set>
+          <include path="**/link-site.exe" product-name="ArtisanHub Link" />
+          <for-each>
+            <authenticode-sign />
+          </for-each>
+        </pe-file-set>
+        <authenticode-sign />
+      </for-each>
+    </msi-file-set>
+  </zip-file>
+</artifact-configuration>

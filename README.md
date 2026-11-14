@@ -52,6 +52,25 @@ another network. See [section 12 of the design](docs/design.md#12-replacing-the-
 
 GNU Affero General Public License v3.0 only. See [LICENSE](LICENSE).
 
+## Trying the preview on Windows
+
+Releases are on the [Releases page](https://github.com/norjms/artisanhub-link/releases). Pairing by
+code is not built yet, so the preview is set up with the hub's address and key:
+
+```powershell
+msiexec /i ArtisanHubLink-<version>-x64.msi HUBURL=wss://<your hub>/link HUBKEY=<hub key>
+& "C:\Program Files\ArtisanHub Link\link-site.exe" -config "C:\ProgramData\ArtisanHub Link\config.ini" -show-key
+```
+
+The second command prints this site's key, which the hub needs. The service is called
+**ArtisanHub Link** and keeps its log in `C:\ProgramData\ArtisanHub Link`.
+
+## Code signing
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by
+[SignPath Foundation](https://signpath.org/). See the [code signing policy](CODE_SIGNING.md) and
+[privacy](PRIVACY.md).
+
 ## Building the prototype
 
 Go 1.25 or later:

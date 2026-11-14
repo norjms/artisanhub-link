@@ -158,8 +158,9 @@ printer missing from the list shows as offline in the hub.
 
 The site connector is a door into a home network, so it is narrow by design:
 
-- **No inbound ports.** It only connects out. Nothing on the site listens for
-  the internet.
+- **No inbound ports from the internet.** It only connects out. The one thing
+  it listens for is printers announcing themselves (SSDP and mDNS), and on
+  Windows its firewall rule admits that from the local subnet only.
 - **Only the paired hub.** Both keys are checked on every connection. Unknown
   keys are dropped before any stream opens.
 - **Only printers.** The hub asks for "printer address, port". The site
@@ -202,10 +203,17 @@ way it reaches the hub, with an outgoing HTTPS request.
 
 | Platform | Package | Signing |
 | --- | --- | --- |
-| Windows x64 and Arm64 | MSI with the service registered | Azure Artifact Signing, from the Linux build with jsign |
+| Windows x64 and Arm64 | MSI with the service registered | SignPath Foundation (free for open source), approved by hand for each release |
 | macOS Intel and Apple silicon | One universal pkg, launchd daemon | Developer ID Application (binary) and Developer ID Installer (pkg), notarized and stapled |
 | Linux amd64 and arm64 | .deb, .rpm, systemd unit; apt and dnf repository | Repository key |
 | Docker amd64 and arm64 | ghcr.io/norjms/artisanhub-link | Cosign signature |
+
+Windows installers show "SignPath Foundation" as the publisher: the project
+signs through the SignPath Foundation's open source program, which issues the
+certificate to the foundation and checks that each file was built from this
+repository by its release workflow. That program does not allow commercial
+dual-licensing, so Link stays AGPL-3.0-only. See
+[CODE_SIGNING.md](../CODE_SIGNING.md).
 
 The installer on every platform asks for the hub address and pairing code,
 and offers the auto-update choice. On Docker the same values are environment
