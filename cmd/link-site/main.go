@@ -8,7 +8,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"crypto/ed25519"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,6 +23,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/flynn/noise"
 	"github.com/hashicorp/mdns"
 	"github.com/hashicorp/yamux"
 	"github.com/norjms/artisanhub-link/internal/wire"
@@ -43,7 +43,11 @@ var familyPorts = map[string][]int{
 // Allow high ports to that printer for a short window only.
 const ftpWindow = 60 * time.Second
 
+// maxOpen caps the printer connections the site carries at once, whatever the hub asks.
+const maxOpen = 128
+
 type site struct {
+	open     chan struct{}
 	mu       sync.Mutex
 	printers map[string]wire.Printer // by IP
 	ftpOpen  map[string]time.Time    // IP -> window end
@@ -51,7 +55,8 @@ type site struct {
 }
 
 func newSite() *site {
-	return &site{printers: map[string]wire.Printer{}, ftpOpen: map[string]time.Time{}, changed: make(chan struct{}, 1)}
+	return &site{printers: map[string]wire.Printer{}, ftpOpen: map[string]time.Time{}, changed: make(chan struct{}, 1),
+		open: make(chan struct{}, maxOpen)}
 }
 
 func (s *site) add(p wire.Printer) {
@@ -225,6 +230,9 @@ func (s *site) serve(sess *yamux.Session) {
 		if _, err := st.Write([]byte{wire.KindPrinter}); err != nil {
 			return
 		}
+		if err := wire.WriteJSONLine(st, wire.Hello{Version: version}); err != nil {
+			return
+		}
 		for {
 			if err := wire.WriteJSONLine(st, s.list()); err != nil {
 				return
@@ -258,6 +266,15 @@ func (s *site) handle(st *yamux.Stream) {
 		st.Close()
 		return
 	}
+	select {
+	case s.open <- struct{}{}:
+		defer func() { <-s.open }()
+	default:
+		log.Printf("refused %s:%d: %d printer connections open already", o.IP, o.Port, maxOpen)
+		_, _ = st.Write([]byte{wire.StatusDenied})
+		st.Close()
+		return
+	}
 	if ok, why := s.allowed(o.IP, o.Port); !ok {
 		log.Printf("refused %s:%d: %s", o.IP, o.Port, why)
 		_, _ = st.Write([]byte{wire.StatusDenied})
@@ -285,17 +302,18 @@ type bufStream struct {
 
 func (b bufStream) Read(p []byte) (int, error) { return b.r.Read(p) }
 
-func (s *site) run(ctx context.Context, hubURL string, priv ed25519.PrivateKey, hubPub ed25519.PublicKey) error {
+func (s *site) run(ctx context.Context, linkURL string, static noise.DHKey, hubPub []byte) error {
 	dctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	ws, _, err := websocket.Dial(dctx, hubURL, &websocket.DialOptions{HTTPClient: http.DefaultClient})
+	ws, _, err := websocket.Dial(dctx, linkURL, &websocket.DialOptions{HTTPClient: http.DefaultClient})
 	if err != nil {
 		return err
 	}
 	ws.SetReadLimit(-1)
-	conn := websocket.NetConn(ctx, ws, websocket.MessageBinary)
-	defer conn.Close()
-	if err := wire.SiteHandshake(conn, priv, hubPub); err != nil {
+	raw := websocket.NetConn(ctx, ws, websocket.MessageBinary)
+	defer raw.Close()
+	conn, err := wire.SiteHandshake(raw, static, hubPub)
+	if err != nil {
 		return err
 	}
 	cfg := yamux.DefaultConfig()
@@ -305,7 +323,7 @@ func (s *site) run(ctx context.Context, hubURL string, priv ed25519.PrivateKey, 
 	if err != nil {
 		return err
 	}
-	log.Printf("connected to hub")
+	log.Printf("connected to the hub")
 	s.serve(sess)
 	return fmt.Errorf("hub connection closed")
 }
@@ -314,15 +332,18 @@ func (s *site) run(ctx context.Context, hubURL string, priv ed25519.PrivateKey, 
 var version = "dev"
 
 type settings struct {
-	hub, hubKey, keyFile, printers string
+	hub, code, name, printers, dataDir string
 }
 
+func env(name string) string { return strings.TrimSpace(os.Getenv(name)) }
+
 func main() {
-	configFile := flag.String("config", "", "settings file (INI, section [link]: hub, hub_key, key, printers)")
-	hubURL := flag.String("hub", "", "hub link URL, wss://host/link")
-	hubKey := flag.String("hub-key", "", "hub public key pinned at pairing")
-	keyFile := flag.String("key", "", "this site's private key file (default: site.key beside the settings file, or in the current folder)")
-	static := flag.String("printers", "", "extra printers, family=ip,family=ip")
+	configFile := flag.String("config", "", "settings file (INI, section [link]: hub, code, name, printers)")
+	hubURL := flag.String("hub", env("LINK_HUB"), "the hub's address, https://hub.example.com")
+	code := flag.String("code", env("LINK_PAIR_CODE"), "the pairing code the hub showed (used once)")
+	name := flag.String("name", env("LINK_NAME"), "this site's name in the hub")
+	static := flag.String("printers", env("LINK_PRINTERS"), "printers to add by hand, family=ip,family=ip")
+	dataDir := flag.String("data", env("LINK_DATA"), "where this site's key and pairing are kept (default: beside the settings file, or /data)")
 	showKey := flag.Bool("show-key", false, "print this site's public key and exit")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
@@ -331,42 +352,41 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	// Flags win over the settings file, which is read again until the site is
-	// configured, so a service can start before pairing.
+	// Flags and the environment win over the settings file, which is read again until the site is
+	// configured, so a service can start before it has a code.
 	load := func() settings {
-		st := settings{hub: *hubURL, hubKey: *hubKey, keyFile: *keyFile, printers: *static}
+		st := settings{hub: *hubURL, code: *code, name: *name, printers: *static, dataDir: *dataDir}
 		if *configFile != "" {
 			ini, err := readINI(*configFile, "link")
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				log.Printf("settings: %v", err)
 			}
-			if st.hub == "" {
-				st.hub = ini["hub"]
+			for _, f := range []struct {
+				dst *string
+				key string
+			}{{&st.hub, "hub"}, {&st.code, "code"}, {&st.name, "name"}, {&st.printers, "printers"}} {
+				if *f.dst == "" {
+					*f.dst = ini[f.key]
+				}
 			}
-			if st.hubKey == "" {
-				st.hubKey = ini["hub_key"]
-			}
-			if st.printers == "" {
-				st.printers = ini["printers"]
-			}
-			if st.keyFile == "" {
-				st.keyFile = ini["key"]
-			}
-			if st.keyFile == "" {
-				st.keyFile = filepath.Join(filepath.Dir(*configFile), "site.key")
+			if st.dataDir == "" {
+				st.dataDir = filepath.Dir(*configFile)
 			}
 		}
-		if st.keyFile == "" {
-			st.keyFile = "site.key"
+		if st.dataDir == "" {
+			st.dataDir = "/data"
+		}
+		if st.name == "" {
+			st.name, _ = os.Hostname()
 		}
 		return st
 	}
 	if *showKey {
-		priv, err := wire.LoadOrCreateKey(load().keyFile)
+		k, err := wire.LoadOrCreateKey(filepath.Join(load().dataDir, "site.key"))
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(wire.PubString(priv.Public().(ed25519.PublicKey)))
+		fmt.Println(wire.PubString(k.Public))
 		return
 	}
 	run := func(ctx context.Context) { siteMain(ctx, load) }
@@ -379,32 +399,39 @@ func main() {
 func siteMain(ctx context.Context, load func() settings) {
 	log.Printf("ArtisanHub Link site %s", version)
 	var st settings
+	var paired *pairing
 	for {
 		st = load()
-		if st.hub != "" && st.hubKey != "" {
+		key, err := wire.LoadOrCreateKey(filepath.Join(st.dataDir, "site.key"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		paired, err = ensurePaired(ctx, st, key)
+		if err == nil {
 			break
 		}
-		log.Printf("not paired yet: the settings have no hub address and hub key; checking again in 30 s")
+		log.Printf("%v; checking again in 30 s", err)
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(30 * time.Second):
 		}
 	}
-	priv, err := wire.LoadOrCreateKey(st.keyFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	hubPub, err := wire.ParsePub(st.hubKey)
+	key, _ := wire.LoadOrCreateKey(filepath.Join(st.dataDir, "site.key"))
+	log.Printf("paired with %s as site %s; fingerprint %s", paired.Hub, paired.SiteID, paired.Fingerprint)
+	hubPub, err := wire.ParsePub(paired.HubKey)
 	if err != nil {
 		log.Fatal("hub key: ", err)
 	}
-	log.Printf("site key %s", wire.PubString(priv.Public().(ed25519.PublicKey)))
+	linkURL, err := linkAddress(paired.Hub)
+	if err != nil {
+		log.Fatal(err)
+	}
 	s := newSite()
 	for _, item := range strings.Split(st.printers, ",") {
 		if fam, ip, ok := strings.Cut(strings.TrimSpace(item), "="); ok {
 			if _, known := familyPorts[fam]; known {
-				s.add(wire.Printer{IP: ip, Family: fam, Via: "static"})
+				s.add(wire.Printer{IP: strings.TrimSpace(ip), Family: fam, Via: "static"})
 			}
 		}
 	}
@@ -413,7 +440,7 @@ func siteMain(ctx context.Context, load func() settings) {
 	backoff := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()
-		err := s.run(ctx, st.hub, priv, hubPub)
+		err := s.run(ctx, linkURL, key, hubPub)
 		if ctx.Err() != nil {
 			return
 		}

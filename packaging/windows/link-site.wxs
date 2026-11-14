@@ -5,7 +5,7 @@
   Installs link-site.exe as the ArtisanHubLink service, running as Local Service.
   Settings and the site's key live in %ProgramData%\ArtisanHub Link, readable
   only by the service, SYSTEM and administrators.
-  Optional properties: HUBURL and HUBKEY write the hub address and hub key.
+  Optional properties: HUBURL and PAIRCODE write the hub address and the pairing code the hub shows.
   Build: wix build link-site.wxs -arch x64 -ext WixToolset.Firewall.wixext
          -ext WixToolset.Util.wixext -d Version=0.1.0 -d BinDir=... -d SrcDir=...
 -->
@@ -27,7 +27,7 @@
     <MediaTemplate EmbedCab="yes" />
 
     <Property Id="HUBURL" Secure="yes" />
-    <Property Id="HUBKEY" Secure="yes" />
+    <Property Id="PAIRCODE" Secure="yes" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/norjms/artisanhub-link" />
     <Property Id="ARPHELPLINK" Value="https://github.com/norjms/artisanhub-link/issues" />
 
@@ -91,9 +91,9 @@
         <RegistryValue Root="HKLM" Key="Software\ArtisanHub Link" Name="HubSet" Type="integer" Value="1" KeyPath="yes" />
         <IniFile Id="IniHub" Action="addLine" Directory="DATADIR" Name="config.ini" Section="link" Key="hub" Value="[HUBURL]" />
       </Component>
-      <Component Id="ConfigHubKey" Directory="DATADIR" Condition="HUBKEY" Permanent="yes">
-        <RegistryValue Root="HKLM" Key="Software\ArtisanHub Link" Name="HubKeySet" Type="integer" Value="1" KeyPath="yes" />
-        <IniFile Id="IniHubKey" Action="addLine" Directory="DATADIR" Name="config.ini" Section="link" Key="hub_key" Value="[HUBKEY]" />
+      <Component Id="ConfigPairCode" Directory="DATADIR" Condition="PAIRCODE" Permanent="yes">
+        <RegistryValue Root="HKLM" Key="Software\ArtisanHub Link" Name="PairCodeSet" Type="integer" Value="1" KeyPath="yes" />
+        <IniFile Id="IniPairCode" Action="addLine" Directory="DATADIR" Name="config.ini" Section="link" Key="code" Value="[PAIRCODE]" />
       </Component>
     </ComponentGroup>
 
