@@ -310,6 +310,13 @@ func (h *hub) report(siteID string, ps []wire.Printer) {
 	for _, p := range ps {
 		key := identity(siteID, p)
 		s, ok := h.st.Overlays[key]
+		if ok && p.Serial != "" {
+			// Kept from before its serial was heard: that address is no longer this printer's.
+			if _, had := h.st.Overlays[siteID+"|"+p.Family+"|"+p.IP]; had {
+				delete(h.st.Overlays, siteID+"|"+p.Family+"|"+p.IP)
+				changed = true
+			}
+		}
 		if !ok && p.Serial != "" {
 			// Known first by family and address (added by hand, or before its serial was heard): it keeps
 			// that address, now under its serial.
@@ -341,11 +348,31 @@ func (h *hub) report(siteID string, ps []wire.Printer) {
 		e.Printer, e.Online = p, true
 		seen[a] = true
 	}
-	// Each report is the site's full list: anything missing is offline.
-	for a, e := range h.byAddr {
-		if e.Site == siteID && !seen[a] {
-			e.Online = false
+	// Each report is the site's full list: anything missing is offline. An entry for a printer that now
+	// answers at another overlay address (the same family at the same address, its serial heard since) is
+	// dropped, and its address freed.
+	now := map[string]bool{}
+	for a := range seen {
+		if e := h.byAddr[a]; e != nil {
+			now[e.Printer.Family+"|"+e.Printer.IP] = true
 		}
+	}
+	for a, e := range h.byAddr {
+		if e.Site != siteID || seen[a] {
+			continue
+		}
+		if now[e.Printer.Family+"|"+e.Printer.IP] && e.streams == 0 {
+			delete(h.byAddr, a)
+			for k, v := range h.st.Overlays {
+				if v == a.String() {
+					delete(h.st.Overlays, k)
+				}
+			}
+			changed = true
+			log.Printf("overlay %s freed: site %s %s %s answers at another address", a, siteID, e.Printer.Family, e.Printer.IP)
+			continue
+		}
+		e.Online = false
 	}
 	if changed {
 		h.saveLocked()

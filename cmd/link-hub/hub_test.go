@@ -169,3 +169,19 @@ func TestAPrinterKeepsItsAddressWhenItsSerialIsHeard(t *testing.T) {
 		t.Fatalf("the old entry was kept: %v", h.st.Overlays)
 	}
 }
+
+func TestAnOldEntryForTheSamePrinterIsDropped(t *testing.T) {
+	h := testHub(t, t.TempDir())
+	// An entry left from before the hub moved addresses by serial: the same printer at the same address.
+	h.st.Overlays["s1|bambu|192.168.1.60"] = "198.18.0.2"
+	h.byAddr[netip.MustParseAddr("198.18.0.2")] = &printerEntry{Overlay: "198.18.0.2", Site: "s1",
+		Printer: wire.Printer{IP: "192.168.1.60", Family: "bambu"}}
+	h.st.Overlays["s1|serial|31B8"] = "198.18.0.3"
+	h.report("s1", []wire.Printer{{IP: "192.168.1.60", Family: "bambu", Serial: "31B8"}})
+	if _, left := h.byAddr[netip.MustParseAddr("198.18.0.2")]; left {
+		t.Fatal("the old entry is still listed")
+	}
+	if len(h.st.Overlays) != 1 || h.st.Overlays["s1|serial|31B8"] != "198.18.0.3" {
+		t.Fatalf("overlays: %v", h.st.Overlays)
+	}
+}
