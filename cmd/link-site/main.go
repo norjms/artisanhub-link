@@ -29,12 +29,13 @@ import (
 	"github.com/norjms/artisanhub-link/internal/wire"
 )
 
-// ports each family may be reached on. Anything else is refused.
+// ports each family may be reached on. Anything else is refused. 8554 is RTSP, where a camera restreamed on
+// the printer's own machine (go2rtc, as H.264) is served, so the hub pulls a few Mbps instead of raw MJPEG.
 var familyPorts = map[string][]int{
 	"bambu":     {8883, 990, 322, 6000},
-	"moonraker": {7125, 80, 443, 8080},
-	"octoprint": {80, 443, 5000, 8080},
-	"prusalink": {80, 443},
+	"moonraker": {7125, 80, 443, 8080, 8554},
+	"octoprint": {80, 443, 5000, 8080, 8554},
+	"prusalink": {80, 443, 8554},
 	"elegoo":    {3030, 8080},
 	"duet":      {80},
 }
