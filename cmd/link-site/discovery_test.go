@@ -80,3 +80,20 @@ func TestASerialAddedLaterIsKept(t *testing.T) {
 func wireBambu(ip, serial, via string) wire.Printer {
 	return wire.Printer{IP: ip, Family: "bambu", Serial: serial, Via: via}
 }
+
+// A camera restreamed as H.264 on the printer's machine is reached on RTSP's 8554; a Bambu printer's ports
+// stay its own.
+func TestACameraRestreamIsReachableOnRTSP(t *testing.T) {
+	s := newSite()
+	s.add(wire.Printer{IP: "192.168.1.73", Family: "octoprint", Name: "mk3s01", Via: "mdns"})
+	s.add(wire.Printer{IP: "192.168.1.60", Family: "bambu", Via: "ssdp"})
+	if ok, why := s.allowed("192.168.1.73", 8554); !ok {
+		t.Fatalf("octoprint 8554 refused: %s", why)
+	}
+	if ok, _ := s.allowed("192.168.1.60", 8554); ok {
+		t.Fatal("bambu 8554 allowed")
+	}
+	if ok, _ := s.allowed("192.168.1.73", 22); ok {
+		t.Fatal("octoprint 22 allowed")
+	}
+}
