@@ -127,7 +127,7 @@ func main() {
 		}
 	}()
 	go func() {
-		srv := &http.Server{Addr: *api, Handler: h.apiHandler(token), ReadHeaderTimeout: 10 * time.Second}
+		srv := &http.Server{Addr: *api, Handler: h.apiHandler(token, os.Getenv("LINK_STATUS_TOKEN")), ReadHeaderTimeout: 10 * time.Second}
 		log.Fatal(srv.ListenAndServe())
 	}()
 	log.Printf("ArtisanHub Link hub %s; key %s; overlay %s; %d paired sites", version, wire.PubString(static.Public), h.prefix, len(h.st.Sites))

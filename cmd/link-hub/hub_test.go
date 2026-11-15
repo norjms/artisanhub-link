@@ -131,7 +131,7 @@ func TestRevokeForgetsSite(t *testing.T) {
 
 func TestAdminAPINeedsToken(t *testing.T) {
 	h := testHub(t, t.TempDir())
-	srv := httptest.NewServer(h.apiHandler("s3cret-token"))
+	srv := httptest.NewServer(h.apiHandler("s3cret-token", ""))
 	defer srv.Close()
 	for _, tok := range []string{"", "wrong", "s3cret-tokex"} {
 		req, _ := http.NewRequest("POST", srv.URL+"/api/pairing-codes", nil)
@@ -154,6 +154,41 @@ func TestAdminAPINeedsToken(t *testing.T) {
 	}
 	if h.codes.Count() != 1 {
 		t.Fatal("code not recorded")
+	}
+}
+
+// The status token reads the status and nothing else: it cannot make a pairing code or remove a site.
+func TestTheStatusTokenOnlyReadsTheStatus(t *testing.T) {
+	h := testHub(t, t.TempDir())
+	srv := httptest.NewServer(h.apiHandler("s3cret-token", "read-only-token"))
+	defer srv.Close()
+	call := func(method, path, tok string) int {
+		req, _ := http.NewRequest(method, srv.URL+path, bytes.NewReader([]byte(`{}`)))
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if got := call("GET", "/api/status", "read-only-token"); got != 200 {
+		t.Fatalf("status with the status token: %d", got)
+	}
+	if got := call("POST", "/api/pairing-codes", "read-only-token"); got != http.StatusUnauthorized {
+		t.Fatalf("pairing code with the status token: %d", got)
+	}
+	if got := call("GET", "/api/status", "s3cret-token"); got != 200 {
+		t.Fatalf("status with the admin token: %d", got)
+	}
+	// Without a status token set, no empty token reads anything.
+	open := httptest.NewServer(h.apiHandler("s3cret-token", ""))
+	defer open.Close()
+	req, _ := http.NewRequest("GET", open.URL+"/api/status", nil)
+	req.Header.Set("Authorization", "Bearer ")
+	resp, _ := http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("empty token read the status: %d", resp.StatusCode)
 	}
 }
 
