@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miekg/dns"
+
 	"github.com/norjms/artisanhub-link/internal/wire"
 )
 
@@ -89,7 +91,11 @@ func (s *site) probePrusaLink(ctx context.Context) {
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		if isPrusaLink(resp.StatusCode, resp.Header, string(body)) {
-			s.add(wire.Printer{IP: ip, Family: "prusalink", Name: "PrusaLink", Via: "probe"})
+			name := mdnsName(ctx, net.JoinHostPort(ip, "5353"))
+			if name == "" {
+				name = "PrusaLink"
+			}
+			s.add(wire.Printer{IP: ip, Family: "prusalink", Name: name, Via: "probe"})
 		}
 	}
 	for {
@@ -119,4 +125,32 @@ func (s *site) probePrusaLink(ctx context.Context) {
 		case <-time.After(probeEvery):
 		}
 	}
+}
+
+// mdnsName asks a printer itself, at addr (its address and port 5353), for its own name with a reverse mDNS
+// lookup: Buddy printers announce no service but answer this, "prusa-mk4.local." for example. Empty when
+// it does not answer.
+func mdnsName(ctx context.Context, addr string) string {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	rev, err := dns.ReverseAddr(host)
+	if err != nil {
+		return ""
+	}
+	m := new(dns.Msg)
+	m.SetQuestion(rev, dns.TypePTR)
+	m.RecursionDesired = false
+	c := &dns.Client{Net: "udp", Timeout: 2 * time.Second}
+	in, _, err := c.ExchangeContext(ctx, m, addr)
+	if err != nil || in == nil {
+		return ""
+	}
+	for _, rr := range in.Answer {
+		if ptr, ok := rr.(*dns.PTR); ok {
+			return hostName(ptr.Ptr)
+		}
+	}
+	return ""
 }
