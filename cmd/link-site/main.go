@@ -69,6 +69,12 @@ func (s *site) add(p wire.Printer) {
 	if ok && old.Via == "static" && p.Via != "static" {
 		p.Via = "static"
 	}
+	if ok && p.Name == "" {
+		p.Name = old.Name
+	}
+	if ok && p.Serial == "" {
+		p.Serial = old.Serial // a later announcement without it does not lose it
+	}
 	s.printers[p.IP] = p
 	s.mu.Unlock()
 	if !ok || old != p {
@@ -130,15 +136,20 @@ func (s *site) bambuSSDP(ctx context.Context) {
 		s.add(wire.Printer{IP: h["location"], Family: "bambu", Name: h["devname.bambu.com"],
 			Model: h["devmodel.bambu.com"], Serial: h["usn"], Via: "ssdp"})
 	}
+	lc := net.ListenConfig{Control: shareAddress}
 	for _, port := range []int{2021, 1990} {
 		var conn *net.UDPConn
-		for {
-			var err error
-			conn, err = net.ListenUDP("udp4", &net.UDPAddr{Port: port})
+		for tries := 0; ; tries++ {
+			pc, err := lc.ListenPacket(ctx, "udp4", ":"+strconv.Itoa(port))
 			if err == nil {
+				conn = pc.(*net.UDPConn)
 				break
 			}
-			log.Printf("ssdp listen %d: %v; retrying", port, err)
+			// Said once, then every ten minutes: Bambu printers are not found while it lasts.
+			if tries%60 == 0 {
+				log.Printf("Bambu Lab discovery cannot listen on UDP %d (%v); add Bambu printers with LINK_PRINTERS "+
+					"until it can. Retrying every 10 s.", port, err)
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -199,7 +210,7 @@ func (s *site) mdnsBrowse(ctx context.Context) {
 						continue
 					}
 					c.Close()
-					s.add(wire.Printer{IP: e.AddrV4.String(), Family: fam, Name: e.Host, Via: "mdns"})
+					s.add(wire.Printer{IP: e.AddrV4.String(), Family: fam, Name: hostName(e.Host), Via: "mdns"})
 				}
 			}(svc, family)
 			p := mdns.DefaultParams(svc)
@@ -215,6 +226,11 @@ func (s *site) mdnsBrowse(ctx context.Context) {
 		case <-time.After(60 * time.Second):
 		}
 	}
+}
+
+// hostName is an mDNS host name as people know it: "mk3s01.local." is mk3s01.
+func hostName(h string) string {
+	return strings.TrimSuffix(strings.TrimSuffix(h, "."), ".local")
 }
 
 // ---- hub connection ----
@@ -437,6 +453,9 @@ func siteMain(ctx context.Context, load func() settings) {
 	}
 	go s.bambuSSDP(ctx)
 	go s.mdnsBrowse(ctx)
+	if env("LINK_PROBE") != "off" {
+		go s.probePrusaLink(ctx)
+	}
 	backoff := time.Second
 	for ctx.Err() == nil {
 		started := time.Now()
