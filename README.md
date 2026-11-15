@@ -71,7 +71,7 @@ themselves):
 ```sh
 docker run -d --name artisanhub-link --restart unless-stopped --network host \
   -e LINK_HUB=https://<your hub> -e LINK_PAIR_CODE=<code> -e LINK_NAME="Home" \
-  -v artisanhub-link:/data ghcr.io/norjms/artisanhub-link-site:latest
+  -v artisanhub-link:/data ghcr.io/norjms/artisanhub-link:latest
 ```
 
 The code is used once; the site keeps its key and pairing in the `/data` volume. Printers that do not
@@ -94,6 +94,6 @@ go build ./cmd/link-site
 
 ## Container images
 
-`packaging/docker/site.Dockerfile` builds the site connector (`ghcr.io/norjms/artisanhub-link-site`) and
-`packaging/docker/hub.Dockerfile` builds Link Hub (`ghcr.io/norjms/artisanhub-link-hub`), which the
-ArtisanHub installer runs in the hub's stack. Both are built from the repository root for amd64 and arm64.
+`packaging/docker/Dockerfile` builds ArtisanHub Link for printer sites (`ghcr.io/norjms/artisanhub-link`) and
+`packaging/docker/server.Dockerfile` builds the server side (`ghcr.io/norjms/artisanhub-link-server`), which
+the ArtisanHub installer runs in the hub's stack. Both are built from the repository root for amd64 and arm64.

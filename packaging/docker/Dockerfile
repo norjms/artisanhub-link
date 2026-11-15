@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# Link Site for Docker: run with --network host so it can hear printers announce themselves.
+# ArtisanHub Link for a printer site. Run it with --network host so it hears printers announce themselves.
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
 ARG TARGETOS TARGETARCH
 ARG OPHQ_APP_COMMIT=dev
