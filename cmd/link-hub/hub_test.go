@@ -156,3 +156,16 @@ func TestAdminAPINeedsToken(t *testing.T) {
 		t.Fatal("code not recorded")
 	}
 }
+
+func TestAPrinterKeepsItsAddressWhenItsSerialIsHeard(t *testing.T) {
+	h := testHub(t, t.TempDir())
+	h.report("s1", []wire.Printer{{IP: "192.168.1.60", Family: "bambu"}})
+	before := h.st.Overlays["s1|bambu|192.168.1.60"]
+	h.report("s1", []wire.Printer{{IP: "192.168.1.60", Family: "bambu", Serial: "31B8AP610800641"}})
+	if got := h.st.Overlays["s1|serial|31B8AP610800641"]; got == "" || got != before {
+		t.Fatalf("address moved from %q to %q", before, got)
+	}
+	if _, left := h.st.Overlays["s1|bambu|192.168.1.60"]; left || len(h.st.Overlays) != 1 {
+		t.Fatalf("the old entry was kept: %v", h.st.Overlays)
+	}
+}

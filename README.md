@@ -77,6 +77,11 @@ docker run -d --name artisanhub-link --restart unless-stopped --network host \
 The code is used once; the site keeps its key and pairing in the `/data` volume. Printers that do not
 announce themselves can be added with `-e LINK_PRINTERS=moonraker=192.168.1.20,octoprint=192.168.1.21`.
 
+How printers are found: Bambu Lab printers by their SSDP announcements (UDP 2021, shared with other programs
+that listen for them), Klipper and OctoPrint by mDNS, and Prusa printers on the Buddy firmware (MK4, MK4S,
+Core One, XL, MINI), which announce nothing, by asking each address of the site's own /24 network on port 80
+whether PrusaLink answers, every ten minutes. `LINK_PROBE=off` turns that off.
+
 ## Code signing
 
 Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by

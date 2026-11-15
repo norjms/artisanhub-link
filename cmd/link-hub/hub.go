@@ -310,6 +310,15 @@ func (h *hub) report(siteID string, ps []wire.Printer) {
 	for _, p := range ps {
 		key := identity(siteID, p)
 		s, ok := h.st.Overlays[key]
+		if !ok && p.Serial != "" {
+			// Known first by family and address (added by hand, or before its serial was heard): it keeps
+			// that address, now under its serial.
+			if old, had := h.st.Overlays[siteID+"|"+p.Family+"|"+p.IP]; had {
+				delete(h.st.Overlays, siteID+"|"+p.Family+"|"+p.IP)
+				h.st.Overlays[key] = old
+				s, ok, changed = old, true, true
+			}
+		}
 		var a netip.Addr
 		if ok {
 			a, _ = netip.ParseAddr(s)
