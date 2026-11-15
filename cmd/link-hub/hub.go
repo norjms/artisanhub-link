@@ -577,20 +577,27 @@ func (h *hub) revoke(id string) bool {
 	return true
 }
 
-func (h *hub) apiHandler(token string) http.Handler {
+// apiHandler serves the admin API. token is the admin token, which may do everything; statusToken, when set,
+// may only read GET /api/status, for a service that lists the printers (the farm) and must not pair or revoke
+// sites.
+func (h *hub) apiHandler(token, statusToken string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]string{"status": "ok"}) })
-	auth := func(next http.HandlerFunc) http.HandlerFunc {
+	matches := func(got, want string) bool {
+		return want != "" && len(got) == len(want) && constantEqual(got, want)
+	}
+	gate := func(readOnly bool, next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if token == "" || len(got) != len(token) || !constantEqual(got, token) {
+			if !matches(got, token) && !(readOnly && matches(got, statusToken)) {
 				fail(w, http.StatusUnauthorized, "a valid admin token is needed")
 				return
 			}
 			next(w, r)
 		}
 	}
-	mux.HandleFunc("GET /api/status", auth(func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, h.status()) }))
+	auth := func(next http.HandlerFunc) http.HandlerFunc { return gate(false, next) }
+	mux.HandleFunc("GET /api/status", gate(true, func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, h.status()) }))
 	mux.HandleFunc("POST /api/pairing-codes", auth(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Name string `json:"name"`
