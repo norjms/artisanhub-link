@@ -629,7 +629,7 @@ func (h *hub) publicHandler() http.Handler {
 	mux.HandleFunc("/link", h.handleLink)
 	mux.HandleFunc("/link/pair", h.handlePair)
 	mux.HandleFunc("/link/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, 200, map[string]string{"status": "ok", "service": "artisanhub-link-hub", "version": version})
+		writeJSON(w, 200, map[string]string{"status": "ok", "service": "openprinthq-link-hub", "version": version})
 	})
 	return mux
 }

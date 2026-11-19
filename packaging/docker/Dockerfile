@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-# ArtisanHub Link for a printer site. Run it with --network host so it hears printers announce themselves.
+# OpenPrintHQ Link for a printer site. Run it with --network host so it hears printers announce themselves.
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
 ARG TARGETOS TARGETARCH
 ARG OPHQ_APP_COMMIT=dev

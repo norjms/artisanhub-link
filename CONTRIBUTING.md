@@ -2,7 +2,7 @@
 
 Thank you for helping. A few things to know first:
 
-- **License.** ArtisanHub Link is licensed under the GNU Affero General Public License v3.0 only.
+- **License.** OpenPrintHQ Link is licensed under the GNU Affero General Public License v3.0 only.
   Contributions are accepted under the same license, and the project is not offered under any other
   license.
 - **Sign-off.** Add a `Signed-off-by:` line to each commit (`git commit -s`), confirming you wrote the
