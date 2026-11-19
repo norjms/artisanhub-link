@@ -1,12 +1,12 @@
-# ArtisanHub Link
+# OpenPrintHQ Link
 
-ArtisanHub Link connects an ArtisanHub hub to 3D printers on another network.
+OpenPrintHQ Link connects an OpenPrintHQ hub to 3D printers on another network.
 Use it when the hub runs in the cloud and the printers are at home, or when one
 hub runs a farm spread over several sites.
 
 Link has two parts:
 
-- **Link Hub** runs next to the hub. The ArtisanHub installer sets it up when
+- **Link Hub** runs next to the hub. The OpenPrintHQ installer sets it up when
   you choose to.
 - **Link Site** runs on one always-on computer at each place with printers.
   It finds the printers on that network and carries printer traffic to the hub.
@@ -99,6 +99,6 @@ go build ./cmd/link-site
 
 ## Container images
 
-`packaging/docker/Dockerfile` builds ArtisanHub Link for printer sites (`ghcr.io/norjms/artisanhub-link`) and
+`packaging/docker/Dockerfile` builds OpenPrintHQ Link for printer sites (`ghcr.io/norjms/artisanhub-link`) and
 `packaging/docker/server.Dockerfile` builds the server side (`ghcr.io/norjms/artisanhub-link-server`), which
-the ArtisanHub installer runs in the hub's stack. Both are built from the repository root for amd64 and arm64.
+the OpenPrintHQ installer runs in the hub's stack. Both are built from the repository root for amd64 and arm64.
