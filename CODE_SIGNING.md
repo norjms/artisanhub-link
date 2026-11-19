@@ -29,7 +29,7 @@ authentication for GitHub and SignPath.
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md). ArtisanHub Link sends nothing anywhere except to the hub its owner
+See [PRIVACY.md](PRIVACY.md). OpenPrintHQ Link sends nothing anywhere except to the hub its owner
 pairs it with, and, when automatic updates are on, to GitHub to check for and download releases.
 
 ## Reporting a problem with a signed file

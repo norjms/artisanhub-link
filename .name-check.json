@@ -1,20 +1,32 @@
 {
-  "mode": "report",
+  "mode": "enforce",
   "allow": [
     "artisanhub-manager",
     "artisanhub\\.managed",
     "artisanhub-push-v1",
     "artisan_hub_[a-z_]+",
-    "artisanhub-connector(\\.php)?"
+    "artisanhub-connector(\\.php)?",
+    "%ProgramData%\\\\ArtisanHub Link",
+    "C:\\\\ProgramData\\\\ArtisanHub Link",
+    "/Library/Application Support/ArtisanHub Link",
+    "/var/lib/artisanhub-link",
+    "artisanhub-link (v1|fingerprint)",
+    "--name artisanhub-link",
+    "-v artisanhub-link:/data"
   ],
   "allow_until_renamed": [
-    "(github\\.com/|ghcr\\.io/)?norjms/artisan-?hub[A-Za-z0-9_.-]*"
+    "(github\\.com/|ghcr\\.io/)?norjms/artisan-?hub[A-Za-z0-9_.-]*",
+    "ArtisanHub ?Link",
+    "project-slug: artisanhub-link"
   ],
   "skip": [
     "CHANGELOG*",
     "*/CHANGELOG*",
     "docs/installer-decision-log.md",
     "docs/change-log.md",
-    "docs/legacy-names.md"
+    "docs/legacy-names.md",
+    "packaging/windows/link-site.wxs",
+    ".signpath/artifact-configuration.xml",
+    "cmd/link-site/service_windows.go"
   ]
 }

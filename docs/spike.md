@@ -4,7 +4,7 @@ Date: 13 November 2026.
 
 ## Setup
 
-- **Hub:** the ArtisanHub beta in Oracle Cloud (arm64, Always Free), reached at
+- **Hub:** the hub's beta in Oracle Cloud (arm64, Always Free), reached at
   its public name over HTTPS. Link Hub ran as a container on the hub's network
   with an iptables redirect for the overlay range, and one host route.
 - **Site:** Link Site on a Linux machine at home (amd64), behind an ordinary

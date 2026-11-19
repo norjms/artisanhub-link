@@ -130,7 +130,7 @@ func main() {
 		srv := &http.Server{Addr: *api, Handler: h.apiHandler(token, os.Getenv("LINK_STATUS_TOKEN")), ReadHeaderTimeout: 10 * time.Second}
 		log.Fatal(srv.ListenAndServe())
 	}()
-	log.Printf("ArtisanHub Link hub %s; key %s; overlay %s; %d paired sites", version, wire.PubString(static.Public), h.prefix, len(h.st.Sites))
+	log.Printf("OpenPrintHQ Link hub %s; key %s; overlay %s; %d paired sites", version, wire.PubString(static.Public), h.prefix, len(h.st.Sites))
 	srv := &http.Server{Addr: *listen, Handler: h.publicHandler(), ReadHeaderTimeout: 10 * time.Second}
 	log.Fatal(srv.ListenAndServe())
 }

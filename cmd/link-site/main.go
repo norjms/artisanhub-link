@@ -414,7 +414,7 @@ func main() {
 }
 
 func siteMain(ctx context.Context, load func() settings) {
-	log.Printf("ArtisanHub Link site %s", version)
+	log.Printf("OpenPrintHQ Link site %s", version)
 	var st settings
 	var paired *pairing
 	for {

@@ -1,4 +1,4 @@
-# How ArtisanHub Link works
+# How OpenPrintHQ Link works
 
 This document describes how Link connects a hub to printers on other networks.
 It covers the parts, how a site is paired, how traffic moves, how printers are
@@ -6,7 +6,7 @@ found, how the connector is locked down, and how it is packaged and updated.
 
 Words used here:
 
-- **Hub**: an ArtisanHub install. It runs the farm, OrcaSlicer, and the rest.
+- **Hub**: an OpenPrintHQ install. It runs the farm, OrcaSlicer, and the rest.
 - **Site**: a network with printers on it (a home, a shop, a second shop).
 - **Link Hub**: the Link service in the hub's stack.
 - **Link Site**: the connector installed on one computer at a site.
@@ -224,14 +224,14 @@ The installer on every platform asks for the hub address and pairing code,
 and offers the auto-update choice. On Docker the same values are environment
 variables.
 
-## 10. In the ArtisanHub installer
+## 10. In the OpenPrintHQ installer
 
 During the hub install, when the hub is not on the same network as the printers
 (or the owner says some printers are elsewhere), the installer asks:
 
 > **Are any of your printers on a different network from this hub?**
 > For example, the hub runs in the cloud and the printers are at home, or you
-> run printers at more than one place. ArtisanHub Link connects them safely
+> run printers at more than one place. OpenPrintHQ Link connects them safely
 > without changing your router. You install a small program on one computer
 > that stays on at each place with printers.
 
@@ -257,7 +257,7 @@ offline.
 ## 12. Replacing the OpenPrintHQ client app and broker
 
 Link replaces the OpenPrintHQ client app and its broker as the way a farm
-reaches printers on another network. That covers ArtisanHub Farm, a hosted
+reaches printers on another network. That covers OpenPrintHQ Farm, a hosted
 farm, and OpenPrintHQ run on its own.
 
 What changes:

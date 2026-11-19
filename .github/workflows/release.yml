@@ -186,14 +186,14 @@ jobs:
           for d in dist/*/; do
             name=$(basename "$d")
             case "$name" in
-              windows-*) (cd "$d" && zip -q "../../out/artisanhub-link-$VERSION-$name.zip" ./*) ;;
-              *) chmod +x "$d"/link-*; tar -C "$d" -czf "out/artisanhub-link-$VERSION-$name.tar.gz" . ;;
+              windows-*) (cd "$d" && zip -q "../../out/openprinthq-link-$VERSION-$name.zip" ./*) ;;
+              *) chmod +x "$d"/link-*; tar -C "$d" -czf "out/openprinthq-link-$VERSION-$name.tar.gz" . ;;
             esac
           done
           cp windows/*.msi out/
           (cd out && sha256sum ./* > SHA256SUMS)
           {
-            echo "ArtisanHub Link $VERSION."
+            echo "OpenPrintHQ Link $VERSION."
             echo
             echo "This is a preview: pairing is by hand until the pairing code arrives. See the README."
             echo
@@ -211,4 +211,4 @@ jobs:
           pre=""
           case "$VERSION" in *-*) pre="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" \
-            --title "ArtisanHub Link $VERSION" --notes-file notes.md $pre
+            --title "OpenPrintHQ Link $VERSION" --notes-file notes.md $pre
