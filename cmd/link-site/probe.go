@@ -15,7 +15,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/wire"
 )
 
 // Prusa printers on the Buddy firmware (MK4, MK4S, Core One, XL, MINI) serve PrusaLink but announce nothing:

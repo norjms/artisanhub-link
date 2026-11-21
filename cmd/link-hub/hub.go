@@ -22,8 +22,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/flynn/noise"
 	"github.com/hashicorp/yamux"
-	"github.com/norjms/artisanhub-link/internal/pairing"
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/pairing"
+	"github.com/norjms/openprinthq-link/internal/wire"
 )
 
 // Limits on what one site carries, so a misbehaving farm cannot use a site to flood its network.

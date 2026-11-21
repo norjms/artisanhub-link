@@ -22,7 +22,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/wire"
 )
 
 const soOriginalDst = 80
