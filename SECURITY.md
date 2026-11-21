@@ -1,7 +1,7 @@
 # Security
 
 Please report security problems privately, through
-[GitHub's private vulnerability reporting](https://github.com/norjms/artisanhub-link/security/advisories/new),
+[GitHub's private vulnerability reporting](https://github.com/norjms/openprinthq-link/security/advisories/new),
 not in a public issue.
 
 Reports about the site connector letting anything other than its paired hub through, or reaching

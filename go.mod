@@ -1,4 +1,4 @@
-module github.com/norjms/artisanhub-link
+module github.com/norjms/openprinthq-link
 
 go 1.25
 

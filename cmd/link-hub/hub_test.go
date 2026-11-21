@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/wire"
 )
 
 func testHub(t *testing.T, dir string) *hub {

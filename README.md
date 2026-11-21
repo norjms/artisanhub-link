@@ -40,7 +40,7 @@ Installers are not published yet.
 | Windows 10 and 11, x64 and Arm | Signed MSI |
 | macOS 12 and later, Intel and Apple silicon | Signed and notarized pkg |
 | Linux x86-64 and arm64 (Debian, Ubuntu, Raspberry Pi OS, Fedora) | .deb, .rpm, apt and dnf repository |
-| Docker, amd64 and arm64 | ghcr.io/norjms/artisanhub-link |
+| Docker, amd64 and arm64 | ghcr.io/norjms/openprinthq-link |
 
 Installing the site connector needs administrator rights, because it runs as a
 system service that starts with the computer.
@@ -54,7 +54,7 @@ GNU Affero General Public License v3.0 only. See [LICENSE](LICENSE).
 
 ## Trying the preview on Windows
 
-Releases are on the [Releases page](https://github.com/norjms/artisanhub-link/releases). In the hub,
+Releases are on the [Releases page](https://github.com/norjms/openprinthq-link/releases). In the hub,
 add a printer site to get a pairing code, then:
 
 ```powershell
@@ -71,7 +71,7 @@ themselves):
 ```sh
 docker run -d --name artisanhub-link --restart unless-stopped --network host \
   -e LINK_HUB=https://<your hub> -e LINK_PAIR_CODE=<code> -e LINK_NAME="Home" \
-  -v artisanhub-link:/data ghcr.io/norjms/artisanhub-link:latest
+  -v artisanhub-link:/data ghcr.io/norjms/openprinthq-link:latest
 ```
 
 The code is used once; the site keeps its key and pairing in the `/data` volume. Printers that do not
@@ -99,6 +99,6 @@ go build ./cmd/link-site
 
 ## Container images
 
-`packaging/docker/Dockerfile` builds OpenPrintHQ Link for printer sites (`ghcr.io/norjms/artisanhub-link`) and
-`packaging/docker/server.Dockerfile` builds the server side (`ghcr.io/norjms/artisanhub-link-server`), which
+`packaging/docker/Dockerfile` builds OpenPrintHQ Link for printer sites (`ghcr.io/norjms/openprinthq-link`) and
+`packaging/docker/server.Dockerfile` builds the server side (`ghcr.io/norjms/openprinthq-link-server`), which
 the OpenPrintHQ installer runs in the hub's stack. Both are built from the repository root for amd64 and arm64.

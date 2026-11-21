@@ -211,7 +211,7 @@ way it reaches the hub, with an outgoing HTTPS request.
 | Windows x64 and Arm64 | MSI with the service registered | SignPath Foundation (free for open source), approved by hand for each release |
 | macOS Intel and Apple silicon | One universal pkg, launchd daemon | Developer ID Application (binary) and Developer ID Installer (pkg), notarized and stapled |
 | Linux amd64 and arm64 | .deb, .rpm, systemd unit; apt and dnf repository | Repository key |
-| Docker amd64 and arm64 | ghcr.io/norjms/artisanhub-link | Cosign signature |
+| Docker amd64 and arm64 | ghcr.io/norjms/openprinthq-link | Cosign signature |
 
 Windows installers show "SignPath Foundation" as the publisher: the project
 signs through the SignPath Foundation's open source program, which issues the

@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/flynn/noise"
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/wire"
 )
 
 // pairing is what the site keeps once paired: the hub, the hub's key to pin, and who it is there.

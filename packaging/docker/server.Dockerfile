@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
       -ldflags "-s -w -X main.version=$(printf %.7s "$OPHQ_APP_COMMIT")" -o /out/link-hub ./cmd/link-hub
 
 FROM alpine:3.22
-LABEL org.opencontainers.image.source=https://github.com/norjms/artisanhub-link org.opencontainers.image.licenses=AGPL-3.0-only
+LABEL org.opencontainers.image.source=https://github.com/norjms/openprinthq-link org.opencontainers.image.licenses=AGPL-3.0-only
 RUN apk add --no-cache iptables ca-certificates && mkdir -p /data && chmod 700 /data
 COPY --from=build /out/link-hub /usr/local/bin/link-hub
 VOLUME /data

@@ -26,7 +26,7 @@ import (
 	"github.com/flynn/noise"
 	"github.com/hashicorp/mdns"
 	"github.com/hashicorp/yamux"
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/wire"
 )
 
 // ports each family may be reached on. Anything else is refused. 8554 is RTSP, where a camera restreamed on

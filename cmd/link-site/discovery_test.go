@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/norjms/artisanhub-link/internal/wire"
+	"github.com/norjms/openprinthq-link/internal/wire"
 	"net"
 	"net/http"
 	"runtime"
